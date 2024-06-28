@@ -111,7 +111,7 @@ public class StudentManagementSystem extends JFrame {
 
         mainPanel.add(inputPanel, BorderLayout.NORTH);
 
-        JPanel buttonPanel = new JPanel(new GridLayout(5, 1, 10, 10));
+        JPanel buttonPanel = new JPanel(new GridLayout(6, 1, 10, 10));
         buttonPanel.setBorder(BorderFactory.createEmptyBorder(10, 0, 10, 0));
         buttonPanel.setBackground(new Color(240, 248, 255));
 
@@ -134,6 +134,11 @@ public class StudentManagementSystem extends JFrame {
         btnDisplay.setBackground(new Color(173, 216, 230));
         btnDisplay.addActionListener(e -> displayAllStudents());
         buttonPanel.add(btnDisplay);
+
+        JButton btnEdit = new JButton("Edit Student");
+        btnEdit.setBackground(new Color(173, 216, 230));
+        btnEdit.addActionListener(e -> editStudent());
+        buttonPanel.add(btnEdit);
 
         JButton btnClear = new JButton("Clear Fields");
         btnClear.setBackground(new Color(173, 216, 230));
@@ -183,28 +188,33 @@ public class StudentManagementSystem extends JFrame {
             return false;
         }
 
-        try {
-            Integer.parseInt(txtEnrollmentNo.getText());
-        } catch (NumberFormatException e) {
-            JOptionPane.showMessageDialog(this, "Invalid Enrollment No format.", "Error", JOptionPane.ERROR_MESSAGE);
-            return false;
-        }
-
-        try {
-            Integer.parseInt(txtSem.getText());
-        } catch (NumberFormatException e) {
-            JOptionPane.showMessageDialog(this, "Invalid Semester format.", "Error", JOptionPane.ERROR_MESSAGE);
-            return false;
-        }
-
-        try {
-            Date.valueOf(txtDob.getText());
-        } catch (IllegalArgumentException e) {
-            JOptionPane.showMessageDialog(this, "Invalid Date of Birth format.", "Error", JOptionPane.ERROR_MESSAGE);
+        if (!isInteger(txtEnrollmentNo.getText(), "Invalid Enrollment No format.") ||
+            !isInteger(txtSem.getText(), "Invalid Semester format.") ||
+            !isValidDate(txtDob.getText(), "Invalid Date of Birth format.")) {
             return false;
         }
 
         return true;
+    }
+
+    private boolean isInteger(String text, String errorMessage) {
+        try {
+            Integer.parseInt(text);
+            return true;
+        } catch (NumberFormatException e) {
+            JOptionPane.showMessageDialog(this, errorMessage, "Error", JOptionPane.ERROR_MESSAGE);
+            return false;
+        }
+    }
+
+    private boolean isValidDate(String text, String errorMessage) {
+        try {
+            Date.valueOf(text);
+            return true;
+        } catch (IllegalArgumentException e) {
+            JOptionPane.showMessageDialog(this, errorMessage, "Error", JOptionPane.ERROR_MESSAGE);
+            return false;
+        }
     }
 
     private void addStudent() {
@@ -229,115 +239,141 @@ public class StudentManagementSystem extends JFrame {
             int result = ps.executeUpdate();
             if (result > 0) {
                 JOptionPane.showMessageDialog(this, "Data inserted successfully :)");
-                // Add to the local list
                 Student newStudent = new Student(enrollmentNo, name, sem, dob, grade);
                 students.add(newStudent);
-                // Update table
                 tableModel.addRow(new Object[] { enrollmentNo, name, sem, dob, grade });
             } else {
                 JOptionPane.showMessageDialog(this, "Insertion failed :(", "Error", JOptionPane.ERROR_MESSAGE);
             }
         } catch (SQLException e) {
-            JOptionPane.showMessageDialog(this, "Error adding student: " + e.getMessage(), "Error",
-                    JOptionPane.ERROR_MESSAGE);
+            JOptionPane.showMessageDialog(this, "Error adding student: " + e.getMessage(), "Error", JOptionPane.ERROR_MESSAGE);
         }
     }
 
     private void removeStudent() {
-        String enrollmentNoStr = JOptionPane.showInputDialog(this,
-                "Enter Enrollment No of student you want to delete:");
+        String enrollmentNoStr = JOptionPane.showInputDialog(this, "Enter Enrollment No of student you want to delete:");
         if (enrollmentNoStr != null && !enrollmentNoStr.isEmpty()) {
-            try {
-                int enrollmentNo = Integer.parseInt(enrollmentNoStr);
+            if (!isInteger(enrollmentNoStr, "Invalid Enrollment No format.")) {
+                return;
+            }
 
-                String query = "DELETE FROM student WHERE EnrollmentNo = ?";
-                try (PreparedStatement ps = con.prepareStatement(query)) {
-                    ps.setInt(1, enrollmentNo);
-                    int result = ps.executeUpdate();
-                    if (result > 0) {
-                        JOptionPane.showMessageDialog(this, "Deleted successfully :)");
-                        students.removeIf(student -> student.getEnrollmentNo() == enrollmentNo);
-                        for (int i = 0; i < tableModel.getRowCount(); i++) {
-                            if ((int) tableModel.getValueAt(i, 0) == enrollmentNo) {
-                                tableModel.removeRow(i);
-                                break;
-                            }
-                        }
-                    } else {
-                        JOptionPane.showMessageDialog(this, "No student found with given Enrollment No :(", "Error",
-                                JOptionPane.ERROR_MESSAGE);
-                    }
+            int enrollmentNo = Integer.parseInt(enrollmentNoStr);
+            String query = "DELETE FROM student WHERE EnrollmentNo = ?";
+            try (PreparedStatement ps = con.prepareStatement(query)) {
+                ps.setInt(1, enrollmentNo);
+                int result = ps.executeUpdate();
+                if (result > 0) {
+                    JOptionPane.showMessageDialog(this, "Data deleted successfully :)");
+                    students.removeIf(student -> student.getEnrollmentNo() == enrollmentNo);
+                    updateTable();
+                } else {
+                    JOptionPane.showMessageDialog(this, "No student found with the given Enrollment No.", "Error", JOptionPane.ERROR_MESSAGE);
                 }
-            } catch (NumberFormatException e) {
-                JOptionPane.showMessageDialog(this, "Invalid Enrollment No format.", "Error",
-                        JOptionPane.ERROR_MESSAGE);
             } catch (SQLException e) {
-                JOptionPane.showMessageDialog(this, "Error removing student: " + e.getMessage(), "Error",
-                        JOptionPane.ERROR_MESSAGE);
+                JOptionPane.showMessageDialog(this, "Error deleting student: " + e.getMessage(), "Error", JOptionPane.ERROR_MESSAGE);
             }
         }
     }
 
     private void searchStudent() {
-        String enrollmentNoStr = JOptionPane.showInputDialog(this,
-                "Enter Enrollment No of student you want to search:");
+        String enrollmentNoStr = JOptionPane.showInputDialog(this, "Enter Enrollment No to search:");
         if (enrollmentNoStr != null && !enrollmentNoStr.isEmpty()) {
-            try {
-                int enrollmentNo = Integer.parseInt(enrollmentNoStr);
+            if (!isInteger(enrollmentNoStr, "Invalid Enrollment No format.")) {
+                return;
+            }
 
-                String query = "SELECT * FROM student WHERE EnrollmentNo = ?";
-                try (PreparedStatement ps = con.prepareStatement(query)) {
-                    ps.setInt(1, enrollmentNo);
-                    ResultSet rs = ps.executeQuery();
+            int enrollmentNo = Integer.parseInt(enrollmentNoStr);
+            String query = "SELECT * FROM student WHERE EnrollmentNo = ?";
+            try (PreparedStatement ps = con.prepareStatement(query)) {
+                ps.setInt(1, enrollmentNo);
+                try (ResultSet rs = ps.executeQuery()) {
                     if (rs.next()) {
                         String name = rs.getString("Name");
                         int sem = rs.getInt("Sem");
                         String dob = rs.getDate("DOB").toString();
                         String grade = rs.getString("Grade");
 
-                        String studentDetails = "Enrollment No: " + enrollmentNo + "\nName: " + name + "\nSemester: "
-                                + sem + "\nDOB: " + dob + "\nGrade: " + grade;
-                        JOptionPane.showMessageDialog(this, studentDetails, "Student Details",
-                                JOptionPane.INFORMATION_MESSAGE);
+                        JOptionPane.showMessageDialog(this,
+                                "Enrollment No: " + enrollmentNo + "\nName: " + name + "\nSemester: " + sem
+                                        + "\nDOB: " + dob + "\nGrade: " + grade);
                     } else {
-                        JOptionPane.showMessageDialog(this, "No student found with given Enrollment No :(", "Error",
-                                JOptionPane.ERROR_MESSAGE);
+                        JOptionPane.showMessageDialog(this, "No student found with the given Enrollment No.", "Error", JOptionPane.ERROR_MESSAGE);
                     }
                 }
-            } catch (NumberFormatException e) {
-                JOptionPane.showMessageDialog(this, "Invalid Enrollment No format.", "Error",
-                        JOptionPane.ERROR_MESSAGE);
             } catch (SQLException e) {
-                JOptionPane.showMessageDialog(this, "Error searching student: " + e.getMessage(), "Error",
-                        JOptionPane.ERROR_MESSAGE);
+                JOptionPane.showMessageDialog(this, "Error searching student: " + e.getMessage(), "Error", JOptionPane.ERROR_MESSAGE);
             }
         }
     }
 
     private void displayAllStudents() {
-        try (Statement stmt = con.createStatement();
-                ResultSet rs = stmt.executeQuery("SELECT * FROM student")) {
-
-            tableModel.setRowCount(0);
-
+        String query = "SELECT * FROM student";
+        try (Statement stmt = con.createStatement(); ResultSet rs = stmt.executeQuery(query)) {
+            students.clear();
             while (rs.next()) {
                 int enrollmentNo = rs.getInt("EnrollmentNo");
                 String name = rs.getString("Name");
                 int sem = rs.getInt("Sem");
                 String dob = rs.getDate("DOB").toString();
                 String grade = rs.getString("Grade");
-                tableModel.addRow(new Object[] { enrollmentNo, name, sem, dob, grade });
+                Student student = new Student(enrollmentNo, name, sem, dob, grade);
+                students.add(student);
             }
-
+            updateTable();
         } catch (SQLException e) {
-            JOptionPane.showMessageDialog(this, "Error displaying students: " + e.getMessage(), "Error",
-                    JOptionPane.ERROR_MESSAGE);
+            JOptionPane.showMessageDialog(this, "Error displaying students: " + e.getMessage(), "Error", JOptionPane.ERROR_MESSAGE);
+        }
+    }
+
+    private void updateTable() {
+        tableModel.setRowCount(0);
+        for (Student student : students) {
+            tableModel.addRow(new Object[] { student.getEnrollmentNo(), student.getName(), student.getSem(), student.getDob(), student.getGrade() });
+        }
+    }
+
+    private void editStudent() {
+        if (!validateFields()) {
+            return;
+        }
+
+        String query = "UPDATE student SET Name = ?, Sem = ?, DOB = ?, Grade = ? WHERE EnrollmentNo = ?";
+        try (PreparedStatement ps = con.prepareStatement(query)) {
+            String name = txtName.getText();
+            int sem = Integer.parseInt(txtSem.getText());
+            String dob = txtDob.getText();
+            String grade = txtGrade.getText();
+            int enrollmentNo = Integer.parseInt(txtEnrollmentNo.getText());
+
+            ps.setString(1, name);
+            ps.setInt(2, sem);
+            ps.setDate(3, Date.valueOf(dob));
+            ps.setString(4, grade);
+            ps.setInt(5, enrollmentNo);
+
+            int result = ps.executeUpdate();
+            if (result > 0) {
+                JOptionPane.showMessageDialog(this, "Data updated successfully :)");
+                for (Student student : students) {
+                    if (student.getEnrollmentNo() == enrollmentNo) {
+                        students.remove(student);
+                        students.add(new Student(enrollmentNo, name, sem, dob, grade));
+                        break;
+                    }
+                }
+                updateTable();
+            } else {
+                JOptionPane.showMessageDialog(this, "Update failed :(", "Error", JOptionPane.ERROR_MESSAGE);
+            }
+        } catch (SQLException e) {
+            JOptionPane.showMessageDialog(this, "Error updating student: " + e.getMessage(), "Error", JOptionPane.ERROR_MESSAGE);
         }
     }
 
     public static void main(String[] args) {
         SwingUtilities.invokeLater(() -> {
-            new StudentManagementSystem().setVisible(true);
+            StudentManagementSystem sms = new StudentManagementSystem();
+            sms.setVisible(true);
         });
     }
 }
